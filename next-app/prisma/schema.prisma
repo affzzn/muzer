@@ -15,7 +15,7 @@ datasource db {
 
 model User {
   id       String   @id @default(cuid())
-  email    String
+  email    String   @unique
   provider Provider
   streams  Stream[] // ← one-to-many: User → Stream
   upvotes  Upvote[]
@@ -32,6 +32,10 @@ model Stream {
   url    String
   extractedId String
   active Boolean @default(true)
+
+  title String @default("")
+  smallImg String @default("")
+  bigImg String @default("")
 
   // new fields to relate back to User:
   user   User   @relation(fields: [userId], references: [id])
