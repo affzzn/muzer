@@ -46,7 +46,11 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
     );
 
     setQueue(sorted);
-    setNowPlaying(sorted[0] || null);
+
+    // Preserve the current nowPlaying if it's still in the list
+    if (!nowPlaying || !sorted.find((s: Stream) => s.id === nowPlaying.id)) {
+      setNowPlaying(sorted[0] || null);
+    }
   };
 
   const extractYouTubeId = (ytUrl: string) => {
@@ -101,11 +105,19 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
     fetchQueue(); // Refresh
   };
 
-  const playNext = () => {
-    if (queue.length > 1) {
-      setNowPlaying(queue[1]);
-      setQueue(queue.slice(1));
-    }
+  const playNext = async () => {
+    if (!nowPlaying || queue.length <= 1) return;
+
+    // Delete the current song from DB
+    await fetch("/api/streams/delete", {
+      method: "POST",
+      body: JSON.stringify({ streamId: nowPlaying.id }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    // Play next
+    setNowPlaying(queue[1]);
+    fetchQueue();
   };
 
   const handleShare = () => {
