@@ -5,11 +5,13 @@ import { useSession } from "next-auth/react";
 
 type Stream = {
   id: string;
+  type: string;
   title: string;
   url: string;
   userId: string;
   extractedId: string;
   smallImg: string;
+  bigImg: string;
   upvotes: number;
   userUpvoted?: boolean;
 };
@@ -73,13 +75,15 @@ export default function DashboardPage() {
       method: "POST",
       body: JSON.stringify({
         url,
-        creatorId: session?.user?.email,
+        // creatorId: session?.user?.email,
+        creatorId: "cmccbe49y0000ithc60dxzqqv", // hardcoded for now
       }),
       headers: { "Content-Type": "application/json" },
     });
 
     setUrl("");
     setPreview(null);
+    // setQueue
     fetchQueue();
   };
 
@@ -210,8 +214,7 @@ export default function DashboardPage() {
                     : "bg-purple-600 hover:bg-purple-700" // ⬆ Upvote style
                 } rounded-md text-sm`}
               >
-                {stream.userUpvoted ? "🔽 Downvote" : "⬆ Upvote"}{" "}
-                {stream.upvotes}
+                {stream.userUpvoted ? "🔽 " : "⬆"} {stream.upvotes}
               </button>
             </div>
           ))}
