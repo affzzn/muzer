@@ -9,7 +9,8 @@ export function Appbar() {
   const user = session.data?.user;
 
   return (
-    <nav className="bg-transparent backdrop-blur-md border-b border-gray-800 text-white px-6 py-4 flex justify-between items-center fixed top-0 left-0 w-full z-50">
+    // <nav className="bg-transparent backdrop-blur-md border-b border-gray-800 text-white px-6 py-4 flex justify-between items-center fixed top-0 left-0 w-full z-50">
+    <nav className="bg-black/60 backdrop-blur-md border-b border-gray-800 text-white px-6 py-4 flex justify-between items-center fixed top-0 left-0 w-full z-50 shadow-lg">
       {/* Logo / App name */}
       <div
         className="text-2xl font-bold tracking-tight cursor-pointer select-none"

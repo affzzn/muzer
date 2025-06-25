@@ -5,6 +5,8 @@ import { prismaClient } from "@/app/lib/db";
 // @ts-ignore
 // import youtubesearchapi from "youtube-search-api";
 import * as youtubesearchapi from "youtube-search-api";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
 
 const YT_REGEX =
   /^(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com\/(?:watch\?(?!.*\blist=)(?:.*&)?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[?&]\S+)?$/;
@@ -71,10 +73,56 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const creatorId = req.nextUrl.searchParams.get("creatorId");
-  const streams = await prismaClient.stream.findMany({
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return NextResponse.json("Unauthorized", { status: 403 });
+  }
+
+  const user = await prismaClient.user.findUnique({
     where: {
-      userId: creatorId ?? "",
+      email: session.user.email,
     },
   });
-  return NextResponse.json(streams, { status: 200 });
+  console.log("user", user);
+
+  if (!user) {
+    return NextResponse.json("Unauthorized", { status: 403 });
+  }
+
+  // const streams = await prismaClient.stream.findMany({
+  //   where: {
+  //     userId: creatorId ?? "",
+  //   },
+  // });
+  // return NextResponse.json(streams, { status: 200 });
+
+  if (!creatorId || creatorId.length === 0) {
+    return NextResponse.json(
+      { error: "creatorId is required" },
+      { status: 400 }
+    );
+  }
+
+  const streams = await prismaClient.stream.findMany({
+    include: {
+      _count: {
+        select: { upvotes: true },
+      },
+      upvotes: {
+        where: {
+          userId: user.id ?? "",
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({
+    streams: streams.map(({ _count, upvotes, ...rest }) => ({
+      ...rest,
+      upvotes: _count.upvotes,
+      userUpvoted: upvotes.length > 0,
+    })),
+  });
 }
