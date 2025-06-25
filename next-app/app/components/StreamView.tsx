@@ -121,7 +121,7 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
   };
 
   const handleShare = () => {
-    const shareableUrl = `${window.location.hostname}/creator/${creatorId}`;
+    const shareableUrl = `${window.location.origin}/creator/${creatorId}`;
     navigator.clipboard.writeText(shareableUrl);
     alert("Room link copied to clipboard!");
   };

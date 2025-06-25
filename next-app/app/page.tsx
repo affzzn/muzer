@@ -8,7 +8,7 @@ export default function HomePage() {
 
       <section className="flex flex-col justify-center items-center text-center px-6 py-12 h-[calc(100vh-64px)] max-w-5xl mx-auto">
         <h1 className="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
-          Muzer
+          muzer
         </h1>
         <p className="text-lg md:text-xl text-gray-400 max-w-2xl">
           The social music queue for pubs, parties, and shared spaces. Add
@@ -17,7 +17,7 @@ export default function HomePage() {
 
         <div className="mt-10 flex justify-center gap-4 flex-wrap">
           <Link
-            href="/auth"
+            href="/dashboard"
             className="bg-purple-600 hover:bg-purple-700 transition px-6 py-3 rounded-lg font-medium text-white"
           >
             Get Started
