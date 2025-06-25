@@ -16,6 +16,8 @@ type Stream = {
   userUpvoted?: boolean;
 };
 
+const creatorId = "cmccbe49y0000ithc60dxzqqv";
+
 export default function DashboardPage() {
   const { data: session } = useSession();
 
@@ -75,8 +77,7 @@ export default function DashboardPage() {
       method: "POST",
       body: JSON.stringify({
         url,
-        // creatorId: session?.user?.email,
-        creatorId: "cmccbe49y0000ithc60dxzqqv", // hardcoded for now
+        creatorId: creatorId, // hardcoded
       }),
       headers: { "Content-Type": "application/json" },
     });
@@ -106,12 +107,18 @@ export default function DashboardPage() {
     }
   };
 
+  const handleShare = () => {
+    const shareableUrl = `${window.location.hostname}/creator/${creatorId}`;
+    navigator.clipboard.writeText(shareableUrl);
+    alert("Room link copied to clipboard!");
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white flex flex-col items-center px-6 py-12">
       <div className="w-full max-w-5xl flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">🎵 Muzer</h1>
         <button
-          onClick={() => navigator.clipboard.writeText(window.location.href)}
+          onClick={handleShare}
           className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm rounded-md"
         >
           🔗 Share Room
