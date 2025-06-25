@@ -6,9 +6,12 @@ import { useSession } from "next-auth/react";
 type Stream = {
   id: string;
   title: string;
+  url: string;
+  userId: string;
   extractedId: string;
   smallImg: string;
   upvotes: number;
+  userUpvoted?: boolean;
 };
 
 export default function DashboardPage() {
@@ -80,13 +83,16 @@ export default function DashboardPage() {
     fetchQueue();
   };
 
-  const upvote = async (streamId: string) => {
-    await fetch("/api/upvote", {
+  const toggleVote = async (streamId: string, alreadyVoted: boolean) => {
+    const path = alreadyVoted ? "/api/streams/downvote" : "/api/streams/upvote";
+
+    await fetch(path, {
       method: "POST",
       body: JSON.stringify({ streamId }),
       headers: { "Content-Type": "application/json" },
     });
-    fetchQueue();
+
+    fetchQueue(); // Refresh
   };
 
   const playNext = () => {
@@ -195,10 +201,17 @@ export default function DashboardPage() {
                 </p>
               </div>
               <button
-                onClick={() => upvote(stream.id)}
-                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded-md text-sm"
+                onClick={() =>
+                  toggleVote(stream.id, stream.userUpvoted ?? false)
+                }
+                className={`px-3 py-1 ${
+                  stream.userUpvoted
+                    ? "bg-red-600 hover:bg-red-700" // 🔽 Downvote style
+                    : "bg-purple-600 hover:bg-purple-700" // ⬆ Upvote style
+                } rounded-md text-sm`}
               >
-                ⬆ {stream.upvotes}
+                {stream.userUpvoted ? "🔽 Downvote" : "⬆ Upvote"}{" "}
+                {stream.upvotes}
               </button>
             </div>
           ))}
