@@ -34,5 +34,5 @@ export default function DashboardPage() {
     );
   }
 
-  return <StreamView creatorId={creatorId} />;
+  return <StreamView creatorId={creatorId} playVideo={true} />;
 }

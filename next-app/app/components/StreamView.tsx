@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Appbar } from "./Appbar";
+// @ts-ignore
+import YouTubePlayer from "youtube-player";
 
 type Stream = {
   id: string;
@@ -17,9 +19,13 @@ type Stream = {
   userUpvoted?: boolean;
 };
 
-// const creatorId = "cmccbe49y0000ithc60dxzqqv";
-
-export default function StreamView({ creatorId }: { creatorId: string }) {
+export default function StreamView({
+  creatorId,
+  playVideo = false,
+}: {
+  creatorId: string;
+  playVideo?: boolean;
+}) {
   const { data: session } = useSession();
 
   const [url, setUrl] = useState("");
@@ -31,25 +37,62 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
   const [queue, setQueue] = useState<Stream[]>([]);
   const [nowPlaying, setNowPlaying] = useState<Stream | null>(null);
 
+  const videoPlayerRef = useRef<HTMLDivElement | null>(null);
+  const playerRef = useRef<any>(null); // persistent player instance
+
+  // Auto-refresh queue every 10s
   useEffect(() => {
-    fetchQueue();
+    refreshQueue();
+    const interval = setInterval(refreshQueue, 10000);
+    return () => clearInterval(interval);
   }, []);
 
-  const fetchQueue = async () => {
-    const res = await fetch(`/api/streams/?creatorId=${creatorId}`);
-    const result = await res.json();
+  useEffect(() => {
+    if (!playVideo || !videoPlayerRef.current || !nowPlaying?.extractedId)
+      return;
 
-    if (!Array.isArray(result.streams)) return;
+    if (!playerRef.current) {
+      playerRef.current = YouTubePlayer(videoPlayerRef.current);
+      playerRef.current.on("stateChange", (event: any) => {
+        if (event.data === 0) playNext(); // Video ended
+      });
+    }
 
-    const sorted = result.streams.sort(
-      (a: any, b: any) => b.upvotes - a.upvotes
-    );
+    playerRef.current.getVideoUrl().then((url: string) => {
+      try {
+        const parsed = new URL(url);
+        const currentId = parsed.searchParams.get("v");
 
+        if (currentId !== nowPlaying.extractedId) {
+          playerRef.current.loadVideoById(nowPlaying.extractedId);
+        }
+      } catch (err) {
+        console.warn("Invalid video URL from YouTube player:", url, err);
+        // Fallback: just try loading
+        playerRef.current.loadVideoById(nowPlaying.extractedId);
+      }
+    });
+  }, [nowPlaying, playVideo]);
+
+  const refreshQueue = async () => {
+    const res = await fetch(`/api/streams/?creatorId=${creatorId}`, {
+      credentials: "include",
+    });
+    const json = await res.json();
+    if (!Array.isArray(json.streams)) return;
+
+    const sorted = json.streams.sort((a: any, b: any) => b.upvotes - a.upvotes);
     setQueue(sorted);
 
-    // Preserve the current nowPlaying if it's still in the list
-    if (!nowPlaying || !sorted.find((s: Stream) => s.id === nowPlaying.id)) {
-      setNowPlaying(sorted[0] || null);
+    const newActive = json.activeStream?.stream;
+    if (newActive && newActive.id !== nowPlaying?.id) {
+      setNowPlaying(newActive);
+    } else if (
+      !newActive &&
+      sorted.length > 0 &&
+      sorted[0].id !== nowPlaying?.id
+    ) {
+      setNowPlaying(sorted[0]);
     }
   };
 
@@ -82,42 +125,36 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
       method: "POST",
       body: JSON.stringify({
         url,
-        creatorId: creatorId, // hardcoded
+        creatorId: creatorId,
       }),
       headers: { "Content-Type": "application/json" },
     });
 
     setUrl("");
     setPreview(null);
-    // setQueue
-    fetchQueue();
+    refreshQueue();
   };
 
   const toggleVote = async (streamId: string, alreadyVoted: boolean) => {
     const path = alreadyVoted ? "/api/streams/downvote" : "/api/streams/upvote";
-
     await fetch(path, {
       method: "POST",
       body: JSON.stringify({ streamId }),
       headers: { "Content-Type": "application/json" },
     });
-
-    fetchQueue(); // Refresh
+    refreshQueue();
   };
 
   const playNext = async () => {
-    if (!nowPlaying || queue.length <= 1) return;
-
-    // Delete the current song from DB
-    await fetch("/api/streams/delete", {
-      method: "POST",
-      body: JSON.stringify({ streamId: nowPlaying.id }),
+    const res = await fetch("/api/streams/next", {
+      method: "GET",
       headers: { "Content-Type": "application/json" },
     });
-
-    // Play next
-    setNowPlaying(queue[1]);
-    fetchQueue();
+    const json = await res.json();
+    if (json.stream) {
+      setNowPlaying(json.stream);
+    }
+    refreshQueue();
   };
 
   const handleShare = () => {
@@ -129,43 +166,44 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white px-6 pt-28 pb-12">
       <Appbar />
-
       <div className="w-full max-w-7xl mx-auto flex flex-col-reverse lg:flex-row gap-10">
         {/* Left: Queue */}
         <div className="w-full lg:w-2/3">
           <h2 className="text-2xl font-semibold mb-6">🎵 Song Voting Queue</h2>
           <div className="space-y-4">
-            {queue.slice(1).map((stream) => (
-              <div
-                key={stream.id}
-                className="flex items-center justify-between bg-gray-800 p-4 rounded-lg border border-gray-700"
-              >
-                <div className="flex items-center gap-4">
-                  <img
-                    src={stream.smallImg}
-                    alt={stream.title}
-                    width={80}
-                    height={45}
-                    className="rounded-md"
-                  />
-                  <p className="text-sm text-gray-200 max-w-xs truncate">
-                    {stream.title}
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    toggleVote(stream.id, stream.userUpvoted ?? false)
-                  }
-                  className={`px-3 py-1 ${
-                    stream.userUpvoted
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-purple-600 hover:bg-purple-700"
-                  } rounded-md text-sm`}
+            {queue
+              .filter((s) => s.id !== nowPlaying?.id)
+              .map((stream) => (
+                <div
+                  key={stream.id}
+                  className="flex items-center justify-between bg-gray-800 p-4 rounded-lg border border-gray-700"
                 >
-                  {stream.userUpvoted ? "🔽 " : "⬆"} {stream.upvotes}
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={stream.smallImg}
+                      alt={stream.title}
+                      width={80}
+                      height={45}
+                      className="rounded-md"
+                    />
+                    <p className="text-sm text-gray-200 max-w-xs truncate">
+                      {stream.title}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      toggleVote(stream.id, stream.userUpvoted ?? false)
+                    }
+                    className={`px-3 py-1 ${
+                      stream.userUpvoted
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-purple-600 hover:bg-purple-700"
+                    } rounded-md text-sm`}
+                  >
+                    {stream.userUpvoted ? "🔽" : "⬆"} {stream.upvotes}
+                  </button>
+                </div>
+              ))}
           </div>
         </div>
 
@@ -206,8 +244,6 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
                 </button>
               )}
             </div>
-
-            {/* Thumbnail Preview */}
             {preview && (
               <div className="mt-4 text-center">
                 <p className="text-sm mb-2">{preview.title}</p>
@@ -227,22 +263,25 @@ export default function StreamView({ creatorId }: { creatorId: string }) {
             <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 text-center">
               <h2 className="text-lg font-semibold mb-4">Now Playing</h2>
               <div className="aspect-video w-full">
-                <iframe
-                  className="w-full h-64 rounded-md"
-                  src={`https://www.youtube.com/embed/${nowPlaying.extractedId}?autoplay=1&controls=1`}
-                  title="YouTube video player"
-                  frameBorder="0"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                />
+                {playVideo ? (
+                  <div ref={videoPlayerRef} className="w-full h-64" />
+                ) : (
+                  <img
+                    src={nowPlaying.bigImg}
+                    alt={nowPlaying.title}
+                    className="w-full h-64 object-cover rounded"
+                  />
+                )}
               </div>
               <p className="mt-4 text-sm text-gray-300">{nowPlaying.title}</p>
-              <button
-                onClick={playNext}
-                className="mt-4 px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-sm transition"
-              >
-                ▶️ Play Next
-              </button>
+              {playVideo && (
+                <button
+                  onClick={playNext}
+                  className="mt-4 px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-sm transition"
+                >
+                  ▶️ Play Next
+                </button>
+              )}
             </div>
           )}
         </div>

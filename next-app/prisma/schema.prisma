@@ -41,7 +41,18 @@ model Stream {
   user   User   @relation(fields: [userId], references: [id])
   userId String
 
+  played Boolean @default(false)
+  playedTimeStamp DateTime? @default(now())
+
   upvotes Upvote[]
+  currentStream CurrentStream?
+}
+
+
+model CurrentStream{
+  userId String @id
+  streamId String? @unique
+  stream Stream? @relation(fields: [streamId], references: [id])
 }
 
 enum StreamType {
@@ -55,7 +66,7 @@ model Upvote {
   streamId String
 
   user   User   @relation(fields: [userId], references: [id])
-  stream Stream @relation(fields: [streamId], references: [id])
+  stream Stream @relation(fields: [streamId], references: [id], onDelete: Cascade)
 
   @@unique([userId, streamId])
 }

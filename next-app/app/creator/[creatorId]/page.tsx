@@ -5,5 +5,5 @@ export default function ({
 }: {
   params: { creatorId: string };
 }) {
-  return <StreamView creatorId={creatorId} />;
+  return <StreamView creatorId={creatorId} playVideo={false} />;
 }

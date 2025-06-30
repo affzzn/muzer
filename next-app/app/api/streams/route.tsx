@@ -91,13 +91,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json("Unauthorized", { status: 403 });
   }
 
-  // const streams = await prismaClient.stream.findMany({
-  //   where: {
-  //     userId: creatorId ?? "",
-  //   },
-  // });
-  // return NextResponse.json(streams, { status: 200 });
-
   if (!creatorId || creatorId.length === 0) {
     return NextResponse.json(
       { error: "creatorId is required" },
@@ -105,18 +98,34 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const streams = await prismaClient.stream.findMany({
-    include: {
-      _count: {
-        select: { upvotes: true },
+  const [streams, activeStream] = await Promise.all([
+    await prismaClient.stream.findMany({
+      where: {
+        userId: creatorId,
+        played: false,
       },
-      upvotes: {
-        where: {
-          userId: user.id ?? "",
+      include: {
+        _count: {
+          select: {
+            upvotes: true,
+          },
+        },
+        upvotes: {
+          where: {
+            userId: user.id,
+          },
         },
       },
-    },
-  });
+    }),
+    prismaClient.currentStream.findFirst({
+      where: {
+        userId: creatorId,
+      },
+      include: {
+        stream: true,
+      },
+    }),
+  ]);
 
   return NextResponse.json({
     streams: streams.map(({ _count, upvotes, ...rest }) => ({
@@ -124,5 +133,6 @@ export async function GET(req: NextRequest) {
       upvotes: _count.upvotes,
       userUpvoted: upvotes.length > 0,
     })),
+    activeStream,
   });
 }
