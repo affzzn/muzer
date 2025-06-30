@@ -3,6 +3,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { NextResponse } from "next/server";
 import { prismaClient } from "@/app/lib/db";
 
+import { emitToSocket } from "@/app/lib/emitToSocket";
+
 export async function GET() {
   const session = await getServerSession(authOptions);
 
@@ -72,6 +74,8 @@ export async function GET() {
       streamId: nextStream.id,
     },
   });
+
+  await emitToSocket(user.id, "now-playing", { stream: nextStream });
 
   return NextResponse.json({ stream: nextStream });
 }

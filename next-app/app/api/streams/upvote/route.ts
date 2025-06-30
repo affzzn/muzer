@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
+import { emitToSocket } from "@/app/lib/emitToSocket";
+
 const UpvoteSchema = z.object({
   streamId: z.string(),
 });
@@ -27,6 +29,17 @@ export async function POST(request: NextRequest) {
         userId: user.id,
       },
     });
+
+    // Emit to socket to notify clients about the upvote
+    const stream = await prismaClient.stream.findUnique({
+      where: { id: streamId },
+    });
+
+    if (!stream) {
+      return NextResponse.json({ error: "Stream not found" }, { status: 404 });
+    }
+
+    await emitToSocket(stream.userId, "song-voted");
 
     return NextResponse.json(
       { message: "Upvoted successfully" },

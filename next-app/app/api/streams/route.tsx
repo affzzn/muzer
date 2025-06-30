@@ -8,6 +8,10 @@ import * as youtubesearchapi from "youtube-search-api";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 
+import { emitToSocket } from "@/app/lib/emitToSocket";
+
+
+
 const YT_REGEX =
   /^(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com\/(?:watch\?(?!.*\blist=)(?:.*&)?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[?&]\S+)?$/;
 
@@ -56,6 +60,8 @@ export async function POST(req: NextRequest) {
           "https://cdn.pixabay.com/photo/2024/02/28/07/42/european-shorthair-8601492_640.jpg",
       },
     });
+
+    await emitToSocket(data.creatorId, "song-added", { stream });
 
     return NextResponse.json(
       { message: "Stream added successfully", id: stream.id },
