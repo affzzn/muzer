@@ -100,6 +100,8 @@ export default function StreamView({
           if (!prev || prev.id !== newActive.id) return newActive;
           return prev;
         });
+      } else if (sorted.length > 0) {
+        setNowPlaying(sorted[0]);
       }
     } catch (err) {
       console.error("Failed to refresh queue:", err);

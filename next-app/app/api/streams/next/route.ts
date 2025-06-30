@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prismaClient } from "@/app/lib/db";
 
 import { emitToSocket } from "@/app/lib/emitToSocket";
+import { redis } from "@/app/lib/redis";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -76,6 +77,9 @@ export async function GET() {
   });
 
   await emitToSocket(user.id, "now-playing", { stream: nextStream });
+
+  await redis.del(`streams:${user.id}`);
+  await redis.del(`nowplaying:${user.id}`);
 
   return NextResponse.json({ stream: nextStream });
 }

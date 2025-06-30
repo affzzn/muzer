@@ -9,8 +9,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 
 import { emitToSocket } from "@/app/lib/emitToSocket";
-
-
+import { redis } from "@/app/lib/redis";
 
 const YT_REGEX =
   /^(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com\/(?:watch\?(?!.*\blist=)(?:.*&)?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[?&]\S+)?$/;
@@ -63,6 +62,8 @@ export async function POST(req: NextRequest) {
 
     await emitToSocket(data.creatorId, "song-added", { stream });
 
+    await redis.del(`streams:${data.creatorId}`);
+
     return NextResponse.json(
       { message: "Stream added successfully", id: stream.id },
 
@@ -84,6 +85,17 @@ export async function GET(req: NextRequest) {
 
   if (!session?.user?.email) {
     return NextResponse.json("Unauthorized", { status: 403 });
+  }
+
+  const cachedStreams = await redis.get(`streams:${creatorId}`);
+  const cachedNowPlaying = await redis.get(`nowplaying:${creatorId}`);
+
+  if (cachedStreams && cachedNowPlaying) {
+    console.log("Returning streams from Redis cache");
+    return NextResponse.json({
+      streams: JSON.parse(cachedStreams),
+      activeStream: JSON.parse(cachedNowPlaying),
+    });
   }
 
   const user = await prismaClient.user.findUnique({
@@ -132,13 +144,22 @@ export async function GET(req: NextRequest) {
       },
     }),
   ]);
+  const formattedStreams = streams.map(({ _count, upvotes, ...rest }) => ({
+    ...rest,
+    upvotes: _count.upvotes,
+    userUpvoted: upvotes.length > 0,
+  }));
+
+  await redis.set(`streams:${creatorId}`, JSON.stringify(formattedStreams), {
+    EX: 30, // 30 seconds
+  });
+
+  await redis.set(`nowplaying:${creatorId}`, JSON.stringify(activeStream), {
+    EX: 30,
+  });
 
   return NextResponse.json({
-    streams: streams.map(({ _count, upvotes, ...rest }) => ({
-      ...rest,
-      upvotes: _count.upvotes,
-      userUpvoted: upvotes.length > 0,
-    })),
+    streams: formattedStreams,
     activeStream,
   });
 }

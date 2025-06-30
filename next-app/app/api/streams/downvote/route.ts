@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 import { emitToSocket } from "@/app/lib/emitToSocket";
+import { redis } from "@/app/lib/redis";
 
 const UpvoteSchema = z.object({
   streamId: z.string(),
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
     }
 
     await emitToSocket(stream.userId, "song-voted");
+
+    await redis.del(`streams:${stream.userId}`);
 
     return NextResponse.json(
       { message: "Downvoted successfully" },

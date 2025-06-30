@@ -1,6 +1,18 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient } from "redis";
 
+// Redis setup
+const pubClient = createClient({
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+});
+const subClient = pubClient.duplicate();
+
+await pubClient.connect();
+await subClient.connect();
+
+// HTTP Server for REST-based emit endpoint
 const httpServer = createServer((req, res) => {
   if (req.method === "POST" && req.url === "/emit") {
     let body = "";
@@ -34,6 +46,7 @@ const httpServer = createServer((req, res) => {
   }
 });
 
+// Socket.IO Server
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
@@ -41,6 +54,10 @@ const io = new Server(httpServer, {
   },
 });
 
+// Attach Redis adapter
+io.adapter(createAdapter(pubClient, subClient));
+
+// Handle WebSocket connections
 io.on("connection", (socket) => {
   console.log("🔌 Socket connected:", socket.id);
 
@@ -54,7 +71,10 @@ io.on("connection", (socket) => {
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`WebSocket server listening at http://localhost:${PORT}`);
+  console.log(
+    `🚀 WebSocket server with Redis listening at http://localhost:${PORT}`
+  );
 });
